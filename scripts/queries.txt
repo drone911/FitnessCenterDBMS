@@ -1,0 +1,65 @@
+1) Show the name, contact information of customers whose membership expiry date is within 15 days
+	
+	SELECT c.name, c.ph_no, m.expiry_date
+	FROM Customer c, Membership m
+	WHERE c.membership_id=m.membership_id AND EXTRACT(day from NOW())-EXTRACT(day from m.expiry_date)<16;
+	
+2) Show the customer_id and name of customers with high body fat(>15%) and low muscle percent(<40%)
+	
+	SELECT c.customer_id, c.name 
+	FROM Customer c, Customer_Report r
+	WHERE c.customer_id=r.customer_id AND r.fat_perc > 15 AND r.muscle_perc <40 
+	ORDER BY c.name;
+	
+3) Show the name of fitness branches ordered according to membership count in descending ordered
+	
+	SELECT f.branch_id, f.name, count(m.membership_id)
+	FROM fitness_branch f, membership m
+	WHERE f.branch_id=m.branch_id
+	GROUP BY f.branch_id, f.name
+	ORDER BY count(m.membership_id) DESC;
+
+4) Show the name of branch manager with their corresponding branch and salary
+	
+	SELECT e.name, m.monthly_salary, b.branch_id, b.name 
+	FROM Manager m, Fitness_Branch b, Employee e
+	WHERE m.branch_id=b.branch_id AND e.employee_id=m.employee_id;
+
+5) Show the schedule of a particular trainer('E003') 
+	
+	SELECT e.name, b.batch_type, b.start_time, b.end_time
+	FROM Employee e, Trainer_Trains_Batch tb, Batch b
+	WHERE b.batch_id=tb.batch_id AND tb.employee_id=e.employee_id AND e.employee_id='E003'
+	ORDER BY b.start_time;
+
+6) Show the equipments which are worned out
+
+	SELECT * 
+	FROM Equipment
+	WHERE equipment_condition='worn';
+
+7) Count the number of employees in each branch
+	
+	SELECT b.branch_id, b.name, COUNT(e.employee_id)
+	FROM Fitness_Branch b, Employee e
+	WHERE e.branch_id=b.branch_id
+	GROUP BY b.branch_id, b.name
+	ORDER BY b.branch_id;
+
+8) Show the entry time and exit time of all customers of a particular facility('F005') on '2019-04-12'
+
+	SELECT ca.customer_id, ca.entry_time, ca.exit_time
+	FROM Customer_Uses_Facility ca
+	WHERE ca.facility_id='F005' and DATE(ca.entry_time)='2019-04-12';
+	
+9) Show the count of males and females customers
+	
+	SELECT gender, COUNT(customer_id)
+	FROM Customer
+	GROUP BY gender;
+
+10) Show the memberships according to it's level
+
+	SELECT membership_level, COUNT(membership_id)
+	FROM Membership
+	GROUP BY membership_level;

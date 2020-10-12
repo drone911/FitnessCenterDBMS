@@ -1,0 +1,159 @@
+CREATE TABLE Fitness_Branch
+(
+  branch_id VARCHAR(5) NOT NULL,
+  name VARCHAR(50) NOT NULL,
+  address_line1 VARCHAR(65) NOT NULL,
+  address_line2 VARCHAR(65) NOT NULL,
+  city VARCHAR(65) NOT NULL,
+  state VARCHAR(65) NOT NULL,
+  email VARCHAR(65),
+  ph_no NUMERIC(10,0) NOT NULL,
+  PRIMARY KEY (branch_id)
+);
+
+CREATE TABLE Employee
+(
+  employee_id VARCHAR(5) NOT NULL,
+  name VARCHAR(65) NOT NULL,
+  date_of_birth DATE NOT NULL,
+  gender CHAR(1) CHECK(gender IN ('M','F')),
+  address_line1 VARCHAR(65) NOT NULL,
+  address_line2 VARCHAR(65),
+  city VARCHAR(65) NOT NULL,
+  state VARCHAR(65) NOT NULL,
+  email VARCHAR(65),
+  ph_no NUMERIC(10,0) NOT NULL,
+  branch_id VARCHAR(5) NOT NULL,
+  PRIMARY KEY (employee_id),
+  FOREIGN KEY (branch_id) REFERENCES Fitness_Branch(branch_id) ON DELETE CASCADE 
+);
+
+CREATE TABLE Batch
+(
+  batch_type VARCHAR(65) NOT NULL,
+  start_time TIME(0) NOT NULL,
+  end_time TIME(0) NOT NULL,
+  batch_id VARCHAR(5) NOT NULL,
+  PRIMARY KEY (batch_id)
+);
+
+CREATE TABLE Trainer
+(
+  hourly_salary NUMERIC(5,2) NOT NULL,
+  employee_id VARCHAR(5) NOT NULL,
+  PRIMARY KEY (employee_id),
+  FOREIGN KEY (employee_id) REFERENCES Employee(employee_id) ON DELETE CASCADE 
+);
+
+CREATE TABLE Manager
+(
+  monthly_salary NUMERIC(8,2) NOT NULL,
+  employee_id VARCHAR(5) NOT NULL,
+  branch_id VARCHAR(5) NOT NULL,
+  PRIMARY KEY (employee_id),
+  FOREIGN KEY (employee_id) REFERENCES Employee(employee_id) ON DELETE CASCADE ,
+  FOREIGN KEY (branch_id) REFERENCES Fitness_Branch(branch_id) ON DELETE CASCADE 
+);
+
+CREATE TABLE Equipment
+(
+  equipment_id VARCHAR(5) NOT NULL,
+  manufacturer VARCHAR(65) NOT NULL,
+  name VARCHAR(65) NOT NULL,
+  type VARCHAR(65) NOT NULL,
+  equipment_condition VARCHAR(100) NOT NULL,
+  branch_id VARCHAR(5) NOT NULL,
+  PRIMARY KEY (equipment_id),
+  FOREIGN KEY (branch_id) REFERENCES Fitness_Branch(branch_id) ON DELETE CASCADE 
+);
+
+CREATE TABLE Membership
+(
+  membership_id VARCHAR(5) NOT NULL,
+  date_created DATE NOT NULL,
+  rate NUMERIC(8,2) NOT NULL,
+  expiry_date DATE NOT NULL,
+  membership_level INT CHECK(membership_level IN (1,2,3)) NOT NULL,
+  branch_id VARCHAR(5) NOT NULL,
+  PRIMARY KEY (membership_id),
+  FOREIGN KEY (branch_id) REFERENCES Fitness_Branch(branch_id) ON DELETE CASCADE 
+);
+
+CREATE TABLE Facility
+(
+  facility_id VARCHAR(5) NOT NULL,
+  name VARCHAR(65) NOT NULL,
+  type VARCHAR(65) NOT NULL,
+  branch_id VARCHAR(5) NOT NULL,
+  PRIMARY KEY (facility_id),
+  FOREIGN KEY (branch_id) REFERENCES Fitness_Branch(branch_id) ON DELETE CASCADE 
+);
+
+CREATE TABLE Clerk
+(
+  weekly_salary NUMERIC(6,2) NOT NULL,
+  employee_id VARCHAR(5) NOT NULL,
+  PRIMARY KEY (employee_id),
+  FOREIGN KEY (employee_id) REFERENCES Employee(employee_id) ON DELETE CASCADE 
+);
+
+CREATE TABLE Trainer_Trains_Batch
+(
+  batch_id VARCHAR(5) NOT NULL,
+  employee_id VARCHAR(5) NOT NULL,
+  PRIMARY KEY (batch_id, employee_id),
+  FOREIGN KEY (batch_id) REFERENCES Batch(batch_id) ON DELETE CASCADE , 
+  FOREIGN KEY (employee_id) REFERENCES Trainer(employee_id) ON DELETE CASCADE 
+);
+
+CREATE TABLE Customer
+(
+  name VARCHAR(65) NOT NULL,
+  customer_id VARCHAR(5) NOT NULL,
+  gender CHAR(1) CHECK(gender IN ('M','F')),
+  date_of_birth DATE NOT NULL,
+  email VARCHAR(65),
+  ph_no NUMERIC(10,0) NOT NULL,
+  personal_trainer_id VARCHAR(5),
+  membership_id VARCHAR(5) NOT NULL,
+  PRIMARY KEY (customer_id),
+  FOREIGN KEY (personal_trainer_id) REFERENCES Trainer(employee_id) ON DELETE CASCADE ,
+  FOREIGN KEY (membership_id) REFERENCES Membership(membership_id) ON DELETE CASCADE 
+);
+
+CREATE TABLE Customer_Report
+(
+  report_id VARCHAR(5) NOT NULL,
+  weight NUMERIC(5,2) NOT NULL,
+  fat_perc NUMERIC(5,2) NOT NULL,
+  muscle_perc NUMERIC(5,2) NOT NULL,
+  height NUMERIC(5,2) NOT NULL,
+  report_date DATE NOT NULL,
+  customer_id VARCHAR(5) NOT NULL,
+  managed_by VARCHAR(5) NOT NULL,
+  PRIMARY KEY (report_id),
+  FOREIGN KEY (customer_id) REFERENCES Customer(customer_id) ON DELETE CASCADE ,
+  FOREIGN KEY (managed_by) REFERENCES Clerk(employee_id) ON DELETE CASCADE 
+);
+
+CREATE TABLE Customer_Attends_Batch
+(
+  entry_time DATETIME NOT NULL,
+  exit_time DATETIME NOT NULL,
+  customer_id VARCHAR(5) NOT NULL,
+  batch_id VARCHAR(5) NOT NULL,
+  PRIMARY KEY (customer_id, batch_id),
+  FOREIGN KEY (customer_id) REFERENCES Customer(customer_id) ON DELETE CASCADE ,
+  FOREIGN KEY (batch_id) REFERENCES Batch(batch_id) ON DELETE CASCADE 
+);
+
+CREATE TABLE Customer_Uses_Facility
+(
+  entry_time DATETIME NOT NULL,
+  exit_time DATETIME NOT NULL,
+  customer_id VARCHAR(5) NOT NULL,
+  facility_id VARCHAR(5) NOT NULL,
+  PRIMARY KEY (customer_id, facility_id),
+  FOREIGN KEY (customer_id) REFERENCES Customer(customer_id) ON DELETE CASCADE ,
+  FOREIGN KEY (facility_id) REFERENCES Facility(facility_id) ON DELETE CASCADE 
+);

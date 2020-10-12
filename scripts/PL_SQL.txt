@@ -1,0 +1,211 @@
+1) procedure to add entry and exit time of a customer for a batch.
+
+CREATE OR REPLACE PROCEDURE BATCH_ATTENDED(C_ID IN CUSTOMER.CUSTOMER_ID%TYPE, B_ID IN BATCH.BATCH_ID%TYPE, EN_TIME IN CUSTOMER_ATTENDS_BATCH.ENTRY_TIME%TYPE, EX_TIME IN CUSTOMER_ATTENDS_BATCH.EXIT_TIME%TYPE)
+IS
+CUST CUSTOMER.CUSTOMER_ID%TYPE;
+BAT BATCH.BATCH_ID%TYPE;
+NO_CUST_ID EXCEPTION ;
+NO_BATCH_ID EXCEPTION ;
+BEGIN
+SELECT CUSTOMER_ID INTO CUST FROM CUSTOMER WHERE CUSTOMER_ID=C_ID;
+
+IF SQL%NOTFOUND THEN
+RAISE NO_CUST_ID;
+RETURN;
+END IF;
+
+SELECT BATCH_ID INTO BAT FROM BATCH WHERE BATCH_ID=B_ID;
+
+IF SQL%NOTFOUND THEN 
+RAISE NO_BATCH_ID;
+RETURN;
+END IF;
+
+INSERT INTO CUSTOMER_ATTENDS_BATCH(entry_time ,exit_time ,customer_id ,batch_id) VALUES (EN_TIME, EX_TIME, CUST, BAT);
+EXCEPTION
+WHEN NO_CUST_ID THEN 
+DBMS_OUTPUT.PUT_LINE('PROVIDED CUSTOMER ID DOESNT EXIST: '|| C_ID);
+WHEN NO_BATCH_ID THEN
+DBMS_OUTPUT.PUT_LINE('PROVIDED BATCH ID DOESNT EXIST: '|| B_ID);
+
+END;
+#######################################
+2) procedure to add entry and exit time of a customer in a facility.
+CREATE OR REPLACE PROCEDURE FACILITY_ATTENDED(C_ID IN CUSTOMER.CUSTOMER_ID%TYPE, F_ID IN FACILITY.FACILITY_ID%TYPE, EN_TIME IN CUSTOMER_USES_FACILITY.ENTRY_TIME%TYPE, EX_TIME IN CUSTOMER_USES_FACILITY.EXIT_TIME%TYPE)
+IS
+CUST CUSTOMER.CUSTOMER_ID%TYPE;
+FAC FACILITY.FACILITY_ID%TYPE;
+NO_CUST_ID EXCEPTION ;
+NO_FACILITY_ID EXCEPTION ;
+
+BEGIN
+SELECT CUSTOMER_ID INTO CUST FROM CUSTOMER WHERE CUSTOMER_ID=C_ID;
+
+IF SQL%NOTFOUND THEN
+RAISE NO_CUST_ID;
+RETURN;
+END IF;
+
+SELECT FACILITY_ID INTO FAC FROM FACILITY WHERE FACILITY_ID=F_ID;
+
+IF SQL%NOTFOUND THEN 
+RAISE NO_FACILITY_ID;
+RETURN;
+END IF;
+
+INSERT INTO CUSTOMER_USES_FACILITY(entry_time ,exit_time ,customer_id ,facility_id) VALUES (EN_TIME, EX_TIME, CUST, FAC);
+EXCEPTION 
+WHEN NO_CUST_ID THEN
+DBMS_OUTPUT.PUT_LINE('PROVIDED CUSTOMER ID DOESNT EXIST: '|| C_ID);
+WHEN NO_FACILITY_ID THEN
+DBMS_OUTPUT.PUT_LINE('PROVIDED FACILITY ID DOESNT EXIST: '|| F_ID);
+
+END;
+###########################################
+3) Procedure to add new membership which automatically calculates charge bas on expiration date and membership level.
+CREATE OR REPLACE PROCEDURE ADD_MEMBERSHIP(M_ID IN MEMBERSHIP.MEMBERSHIP_ID%TYPE,E_DATE IN MEMBERSHIP.EXPIRY_DATE%TYPE, M_LVL IN MEMBERSHIP.MEMBERSHIP_LEVEL%TYPE, B_ID IN MEMBERSHIP.BRANCH_ID%TYPE)
+IS
+var_branch_id FITNESS_BRANCH.BRANCH_ID%TYPE;
+BEGIN
+SELECT BRANCH_ID INTO var_branch_id FROM FITNESS_BRANCH WHERE BRANCH_ID=var_branch_id;
+
+IF SQL%NOTFOUND THEN
+DBMS_OUTPUT.PUT_LINE('PROVIDED BRANCH ID DOESNT EXIST: '|| B_ID);
+RETURN;
+END IF;
+
+INSERT INTO MEMBERSHIP(MEMBERSHIP_ID,DATE_CREATED , RATE,EXPIRY_DATE, MEMBERSHIP_LEVEL, BRANCH_ID) VALUES (M_ID, SYSDATE, calc_rate(SYSDATE, E_DATE, M_LVL),E_DATE , M_LVL, B_ID);
+END;
+
+############################################
+4) Function to calculate charges based on number of days and membership level. 
+create or replace function calc_rate(create_date in date, end_date in date, mem_lvl in number) 
+return number is
+rate number;
+begin
+if mem_lvl=1 then
+rate:=(end_date-create_date)*100;
+elsif mem_lvl=2 then
+rate:=(end_date-create_date)*75;
+else
+rate:=(end_date-create_date)*50;
+end if;
+return rate;
+end;
+#################################################
+5) Function to get the majority of condition of equipments in a particular branch. 
+create or replace function get_majority_equipments(B_ID in equipment.branch_id%type) 
+return varchar2 is
+majority varchar2(5);
+count_worn number;
+count_new number;
+begin
+select count(equipment_id) into count_worn from equipment where branch_id=B_ID and equipment_condition='worn' group by equipment_condition;
+select count(equipment_id) into count_new from equipment where branch_id=B_ID and equipment_condition='new' group by equipment_condition;
+if count_worn>count_new then
+majority:='worn';
+else
+majority:='new';
+end if;
+return majority;
+end;
+#################################################
+6) Cursor to print and also store records in table to_call of customers who haven't attended any batch for more than a week.
+prerequiremnt:
+	create table to_call(customer_id varchar2(5), name varchar2(65), ph_no number(10));
+
+declare 
+cursor not_attend is select customer.customer_id, customer.name, customer.ph_no from customer where customer.customer_id in (select customer_id from customer_attends_batch group by customer_id having SYSDATE - max(entry_time) > 7); 
+cust_id customer.customer_id%type;
+cust_name customer.name%type;
+cust_ph_no customer.ph_no%type;
+begin
+delete from to_call;
+open not_attend;
+if not_attend%isopen then
+loop
+fetch not_attend into cust_id, cust_name, cust_ph_no;
+EXIT WHEN not_attend%NOTFOUND;
+IF not_attend%found THEN
+insert into to_call(customer_id, name, ph_no) values (cust_id, cust_name, cust_ph_no);
+dbms_output.put_line(cust_id || ': ' || cust_name || 'has not attended any batch for more than a week . Contact: '|| cust_ph_no);
+end if;
+end loop;
+else
+dbms_output.put_line('Unable to open cursor');
+end if;
+
+end;
+#################################################
+7) Cursor to change the rate of membership as per the calc_rate. 
+declare
+cursor update_rate is select membership.membership_id, membership.date_created, membership.expiry_date, membership.membership_level, membership.rate from membership; 
+mem_id membership.membership_id%type;
+mem_created membership.date_created%type;
+mem_expiry membership.expiry_date%type;
+mem_lvl membership.membership_level%type; 
+old_rate membership.rate%type;
+new_rate membership.rate%type;
+begin
+open update_rate;
+if update_rate%isopen then
+loop
+fetch update_rate into mem_id, mem_created, mem_expiry, mem_lvl, old_rate;
+EXIT WHEN update_rate%NOTFOUND;
+if update_rate%found then
+new_rate:=calc_rate(mem_created, mem_expiry, mem_lvl);
+if new_rate<>old_rate then
+update membership set rate=new_rate where membership_id=mem_id;
+dbms_output.put_line('rate changed from '||old_rate ||' to '||new_rate ||' for membershio_id: '||mem_id);
+end if;
+end if;
+end loop;
+else
+dbms_output.put_line('Unable to open cursor');
+end if;
+
+end;
+
+############################################
+8) Trigger to check whether the customer is able to access the facility or not. 
+CREATE OR REPLACE TRIGGER check_lvl
+    BEFORE INSERT OR UPDATE ON CUSTOMER_USES_FACILITY
+    FOR EACH ROW
+declare
+required_lvl facility.min_membership_level%type;
+current_lvl membership.membership_level%type;
+BEGIN
+select membership.membership_level into current_lvl from membership, customer where customer.membership_id = membership.membership_id and customer.customer_id=:new.customer_id;
+select facility.min_membership_level into required_lvl from facility where facility.facility_id=:new.facility_id;
+if current_lvl>required_lvl then
+raise_application_error(-20000, 'membership level is too low for entry in the facility');
+end if;
+END;
+#################################################
+9) Trigger to check the if the fat percentage and muscle_percentage increased or not. 
+create or replace trigger health_check before insert on customer_report for each row
+declare
+last_fat_perc customer_report.fat_perc%type;
+last_weight customer_report.weight%type;
+last_muscle_perc customer_report.muscle_perc%type;
+begin
+select weight, muscle_perc, fat_perc into last_weight, last_muscle_perc, last_fat_perc from customer_report where customer_id = :new.customer_id and report_date=(select max(report_date) from customer_report where customer_id=:new.customer_id);
+
+if sql%found then
+if last_fat_perc > :new.fat_perc then
+dbms_output.put_line('Hurray!! Your fat percentage decreased from '||last_fat_perc ||' to '|| :new.fat_perc);
+elsif last_fat_perc = :new.fat_perc then
+dbms_output.put_line('Your fat percentage remained the same from '||last_fat_perc ||' to '|| :new.fat_perc||' keep up the good work');
+else
+dbms_output.put_line('Your fat percentage increased from '||last_fat_perc ||' to '|| :new.fat_perc||'. Try harder!!');
+end if;
+
+if last_muscle_perc < :new.muscle_perc then
+dbms_output.put_line('Hurray!! Your fat percentage increased from '||last_muscle_perc||' to '|| :new.muscle_perc);
+elsif last_muscle_perc = :new.muscle_perc then
+dbms_output.put_line('Your fat percentage remained the same from '||last_muscle_perc||' to '|| :new.muscle_perc||' keep up the good work');
+else
+dbms_output.put_line('Your fat percentage decreased from '||last_muscle_perc ||' to '|| :new.muscle_perc||'. Try harder!!');
+end if;
+end if;
+end;
